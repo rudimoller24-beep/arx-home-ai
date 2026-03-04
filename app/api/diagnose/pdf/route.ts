@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     const doc = new PDFDocument({ margin: 40 })
     const chunks: Buffer[] = []
 
-    doc.on('data', (c) => chunks.push(c))
+    doc.on('data', (c: Buffer) => chunks.push(c))
     const done = new Promise<Buffer>((resolve) => {
       doc.on('end', () => resolve(Buffer.concat(chunks)))
     })
