@@ -7,11 +7,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 })
 
 // IMPORTANT: Next.js needs the raw body for Stripe signature verification
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
 
 async function readRawBody(req: Request) {
   const arrayBuffer = await req.arrayBuffer()
