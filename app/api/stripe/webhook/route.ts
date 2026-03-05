@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
-import Stripe from 'stripe'
+import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
- // remove apiVersion
+import { supabaseServer } from "@/lib/supabaseServer";
+
+export const runtime = "nodejs";
 
 // IMPORTANT: Next.js needs the raw body for Stripe signature verification
 
