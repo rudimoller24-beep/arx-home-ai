@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const PDFDocument = require('pdfkit')
 
+export const runtime = 'nodejs'
+
 export async function POST(req: Request) {
   try {
     const { name, phone, area, urgency, prompt, result } = await req.json()
