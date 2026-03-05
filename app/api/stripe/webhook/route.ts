@@ -1,15 +1,21 @@
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import type Stripe from "stripe";
+import { headers } from "next/headers";
+import Stripe from "stripe";
 
-import { stripe } from "@/lib/stripe";
-import { supabaseServer } from "@/lib/supabaseServer";
-
+// Force Node runtime (Stripe + raw body handling is safest in Node)
 export const runtime = "nodejs";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST(req: Request) {
   const body = await req.text();
-  const signature = headers().get("stripe-signature") as string;
+
+  // IMPORTANT: headers() is async in newer Next versions
+  const signature = (await headers()).get("stripe-signature");
+
+  if (!signature) {
+    return NextResponse.json({ error: "Missing Stripe signature" }, { status: 400 });
+  }
 
   let event: Stripe.Event;
 
@@ -20,53 +26,42 @@ export async function POST(req: Request) {
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err: any) {
-    console.error("Webhook signature verification failed:", err.message);
-    return NextResponse.json({ error: "Webhook error" }, { status: 400 });
+    console.error("STRIPE_WEBHOOK_SIGNATURE_ERROR:", err?.message || err);
+    return NextResponse.json(
+      { error: `Webhook Error: ${err?.message || "Invalid signature"}` },
+      { status: 400 }
+    );
   }
 
   try {
+    // Handle events you care about
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
-        const userId = session.metadata?.userId;
-
-        if (userId) {
-          await supabaseServer
-            .from("profiles")
-            .update({
-              subscription_status: "active",
-            })
-            .eq("id", userId);
-        }
+        // Example: session.metadata?.userId
+        // const userId = session.metadata?.userId;
 
         break;
       }
 
+      case "customer.subscription.created":
+      case "customer.subscription.updated":
       case "customer.subscription.deleted": {
-        const subscription = event.data.object as Stripe.Subscription;
+        const sub = event.data.object as Stripe.Subscription;
 
-        const userId = subscription.metadata?.userId;
-
-        if (userId) {
-          await supabaseServer
-            .from("profiles")
-            .update({
-              subscription_status: "inactive",
-            })
-            .eq("id", userId);
-        }
-
+        // Example: sub.status, sub.customer, sub.metadata?.userId
         break;
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        // console.log(`Unhandled event type: ${event.type}`);
+        break;
     }
 
     return NextResponse.json({ received: true });
-  } catch (error) {
-    console.error("Webhook processing error:", error);
+  } catch (err: any) {
+    console.error("STRIPE_WEBHOOK_HANDLER_ERROR:", err);
     return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 });
   }
 }
