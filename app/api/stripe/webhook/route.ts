@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { supabaseServer } from '@/lib/supabaseServer'
+import { stripe } from "@/lib/stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
-})
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+  // remove apiVersion
 
 // IMPORTANT: Next.js needs the raw body for Stripe signature verification
 
