@@ -1,92 +1,124 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { supabaseServer } from '@/lib/supabaseServer'
-import OpenAI from 'openai'
+import { NextResponse } from "next/server";
+import OpenAI from "openai";
+import jwt from "jsonwebtoken";
+import { supabaseServer } from "@/lib/supabaseServer";
 
-const supabasePublic = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+export const runtime = "nodejs";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
 
 export async function POST(req: Request) {
   try {
-    const authHeader = req.headers.get('authorization') || ''
-    const token = authHeader.replace('Bearer ', '').trim()
-    if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 401 })
+    const authHeader = req.headers.get("authorization") || "";
+    const token = authHeader.replace("Bearer ", "").trim();
 
-    const { data: userData, error: userErr } = await supabasePublic.auth.getUser(token)
-    if (userErr || !userData.user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    if (!token) {
+      return NextResponse.json({ error: "Missing token" }, { status: 401 });
     }
 
-    const userId = userData.user.id
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+    const userId = decoded.userId;
 
-    const { data: profile, error: pErr } = await supabaseServer
-      .from('profiles')
-      .select('trial_end, subscription_status')
-      .eq('id', userId)
-      .single()
+    const { name, phone, area, urgency, prompt } = await req.json();
 
-    if (pErr || !profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+    if (!prompt || !prompt.trim()) {
+      return NextResponse.json({ error: "Problem description is required" }, { status: 400 });
     }
 
-    const isActive = profile.subscription_status === 'active'
-    const trialEnd = profile.trial_end ? new Date(profile.trial_end).getTime() : 0
-    const trialValid = Date.now() <= trialEnd
+    // Check subscription status
+    const { data: profile, error: profileError } = await supabaseServer
+      .from("profiles")
+      .select("subscription_status")
+      .eq("id", userId)
+      .single();
 
-    if (!isActive && !trialValid) {
-      return NextResponse.json({ error: 'Trial ended. Please upgrade.' }, { status: 402 })
+    if (profileError || !profile) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    const body = await req.json()
-    const text = body?.text
+    // Free users: max 3 diagnoses
+    if (profile.subscription_status !== "active") {
+      const { count, error: countError } = await supabaseServer
+        .from("diagnoses")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId);
 
-    if (!text || typeof text !== 'string') {
-      return NextResponse.json({ error: 'Missing problem description' }, { status: 400 })
+      if (countError) {
+        return NextResponse.json({ error: "Could not check diagnosis limit" }, { status: 500 });
+      }
+
+      const used = count || 0;
+      if (used >= 3) {
+        return NextResponse.json(
+          { error: "You have reached your 3 free diagnoses. Please upgrade to continue." },
+          { status: 403 }
+        );
+      }
     }
 
-    const prompt = `You are ARX Home AI for South African homeowners.
-Return a clear diagnosis in this structure:
+    const aiPrompt = `
+You are ARX Home AI, a practical home repair and construction diagnosis assistant for South Africa.
 
-1) Category
-2) Likely causes (ranked)
-3) Risk level (Low/Medium/High) + why
-4) DIY difficulty (1-5)
-5) Tools needed
-6) Materials list
-7) Rough material cost estimate in ZAR (range)
-8) Rough labour cost estimate in ZAR (range)
-9) Safety warnings
-10) When to call a professional
-11) Quick next steps checklist
+Customer details:
+- Name: ${name || "-"}
+- Phone: ${phone || "-"}
+- Area: ${area || "-"}
+- Urgency: ${urgency || "-"}
 
-Problem: ${text}`
+Problem:
+${prompt}
+
+Give a practical diagnosis in this format:
+
+1. Likely cause
+2. Risk level
+3. Recommended action
+4. Tools/materials needed
+5. Estimated cost range in South African Rand
+6. When to call a professional
+
+Keep it clear, practical, and suitable for a homeowner.
+`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-    })
+      model: "gpt-4.1-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a practical, professional home repair and renovation diagnosis assistant for ARX Developments in South Africa.",
+        },
+        {
+          role: "user",
+          content: aiPrompt,
+        },
+      ],
+      temperature: 0.4,
+    });
 
-    const result = completion.choices?.[0]?.message?.content || 'No result'
+    const result =
+      completion.choices?.[0]?.message?.content?.trim() ||
+      "Sorry, no diagnosis could be generated.";
 
-// Save history
-await supabaseServer.from('diagnoses').insert({
-  user_id: userId,
-  prompt: text,
-  result,
-})
+    // Save diagnosis history
+    const { error: saveError } = await supabaseServer.from("diagnoses").insert({
+      user_id: userId,
+      problem: prompt,
+      result,
+    });
 
-return NextResponse.json({ result })
+    if (saveError) {
+      console.error("SAVE_DIAGNOSIS_ERROR:", saveError);
+    }
+
+    return NextResponse.json({ result });
   } catch (err: any) {
-    console.error('DIAGNOSE_ERROR:', err)
+    console.error("DIAGNOSE_ERROR:", err);
     return NextResponse.json(
-      { error: err?.message || String(err) || 'Server error' },
+      { error: err?.message || "Server error" },
       { status: 500 }
-    )
+    );
   }
 }
-
-import { FileDown } from 'lucide-react'
