@@ -13,7 +13,7 @@ export default function Dashboard() {
     if (!token) {
       router.push('/login')
     }
-  }, [])
+  }, [router])
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -22,10 +22,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#0b0f14] text-white p-6">
-
-      {/* Top bar */}
       <div className="flex justify-between items-center mb-8">
-
         <div className="flex items-center gap-3">
           <div className="bg-white/5 border border-white/10 rounded-xl p-2">
             <Image
@@ -51,10 +48,7 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Dashboard Content */}
-      <div className="grid md:grid-cols-2 gap-6">
-
-        {/* AI Diagnosis Tool */}
+      <div className="grid md:grid-cols-4 gap-6">
         <div className="border border-white/10 bg-white/5 rounded-2xl p-6">
           <h2 className="text-xl font-bold mb-2">AI Diagnosis Tool</h2>
 
@@ -70,7 +64,21 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* Subscription */}
+        <div className="border border-white/10 bg-white/5 rounded-2xl p-6">
+          <h2 className="text-xl font-bold mb-2">Diagnosis History</h2>
+
+          <p className="text-white/60 mb-4">
+            Revisit your previous AI diagnoses and past problems.
+          </p>
+
+          <button
+            onClick={() => router.push('/history')}
+            className="bg-[#F59E0B] text-black px-4 py-2 rounded-xl font-bold hover:opacity-90"
+          >
+            View History
+          </button>
+        </div>
+
         <div className="border border-white/10 bg-white/5 rounded-2xl p-6">
           <h2 className="text-xl font-bold mb-2">Subscription</h2>
 
@@ -86,6 +94,20 @@ export default function Dashboard() {
           </button>
         </div>
 
+        <div className="border border-white/10 bg-white/5 rounded-2xl p-6">
+          <h2 className="text-xl font-bold mb-2">Admin</h2>
+
+          <p className="text-white/60 mb-4">
+            View platform stats and ARX Home AI usage.
+          </p>
+
+          <button
+            onClick={() => router.push('/admin')}
+            className="bg-[#F59E0B] text-black px-4 py-2 rounded-xl font-bold hover:opacity-90"
+          >
+            Open Admin
+          </button>
+        </div>
       </div>
     </div>
   )
