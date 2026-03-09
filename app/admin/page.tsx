@@ -4,74 +4,123 @@ import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function Admin() {
+type Stats = {
+  users: number
+  diagnoses: number
+  paidSubscribers: number
+}
+
+export default function AdminPage() {
   const router = useRouter()
-  const [stats, setStats] = useState<{ users: number; activeSubscribers: number; diagnoses: number } | null>(null)
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
+
     if (!token) {
       router.push('/login')
       return
     }
 
-    ;(async () => {
-      const res = await fetch('/api/admin/stats', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error || 'Failed')
-        return
+    const loadStats = async () => {
+      try {
+        const res = await fetch('/api/admin/stats')
+        const data = await res.json()
+
+        if (!res.ok) {
+          setError(data.error || 'Could not load admin stats')
+          return
+        }
+
+        setStats(data)
+      } catch {
+        setError('Server error')
+      } finally {
+        setLoading(false)
       }
-      setStats(data)
-    })()
+    }
+
+    loadStats()
   }, [router])
 
   return (
     <div className="min-h-screen bg-[#0b0f14] text-white">
-      <div className="border-b border-white/10">
-        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Image src="/arx-logo.jpg" alt="ARX" width={90} height={40} />
+      <div className="border-b border-white/10 bg-gradient-to-r from-[#1b1307] via-[#0b0f14] to-[#101826]">
+        <div className="mx-auto max-w-6xl px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-2">
+              <Image
+                src="/arx-logo.jpg"
+                alt="ARX"
+                width={105}
+                height={50}
+                className="rounded-xl"
+              />
+            </div>
             <div>
-              <div className="text-sm text-white/60">ARX Home AI</div>
-              <div className="text-xl font-bold">Admin Analytics</div>
+              <div className="text-white/60 text-sm">ARX Home AI</div>
+              <div className="text-3xl font-bold">Admin Dashboard</div>
             </div>
           </div>
-          <a href="/dashboard" className="rounded-xl bg-white/10 border border-white/15 px-4 py-2 hover:bg-white/15">
-            ← Dashboard
-          </a>
+
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 font-semibold hover:bg-white/10"
+          >
+            Back to Dashboard
+          </button>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto p-6">
+      <div className="mx-auto max-w-6xl px-6 py-8">
+        {loading && (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
+            Loading admin stats...
+          </div>
+        )}
+
         {error && (
-          <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-red-200">
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-red-300">
             {error}
           </div>
         )}
 
-        {!stats && !error && <div className="text-white/70">Loading…</div>}
+        {!loading && !error && stats && (
+          <>
+            <div className="grid gap-6 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
+                <div className="text-white/60 text-sm mb-2">Total Users</div>
+                <div className="text-4xl font-extrabold text-[#F59E0B]">
+                  {stats.users}
+                </div>
+              </div>
 
-        {stats && (
-          <div className="grid gap-6 md:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-              <div className="text-white/60 text-sm">Users</div>
-              <div className="text-4xl font-extrabold mt-2">{stats.users}</div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
+                <div className="text-white/60 text-sm mb-2">Total Diagnoses</div>
+                <div className="text-4xl font-extrabold text-[#F59E0B]">
+                  {stats.diagnoses}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
+                <div className="text-white/60 text-sm mb-2">Paid Subscribers</div>
+                <div className="text-4xl font-extrabold text-[#F59E0B]">
+                  {stats.paidSubscribers}
+                </div>
+              </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-              <div className="text-white/60 text-sm">Active Subscribers</div>
-              <div className="text-4xl font-extrabold mt-2">{stats.activeSubscribers}</div>
+            <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
+              <h2 className="text-2xl font-bold mb-3">Business Snapshot</h2>
+              <div className="text-white/70 space-y-2">
+                <p>• Users registered: {stats.users}</p>
+                <p>• Diagnoses generated: {stats.diagnoses}</p>
+                <p>• Paid conversions: {stats.paidSubscribers}</p>
+              </div>
             </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-              <div className="text-white/60 text-sm">Total Diagnoses</div>
-              <div className="text-4xl font-extrabold mt-2">{stats.diagnoses}</div>
-            </div>
-          </div>
+          </>
         )}
       </div>
     </div>
