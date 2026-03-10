@@ -8,6 +8,7 @@ type Stats = {
   users: number
   diagnoses: number
   paidSubscribers: number
+  leads: number
 }
 
 export default function AdminPage() {
@@ -95,7 +96,7 @@ export default function AdminPage() {
 
         {!loading && !error && stats && (
           <>
-            <div className="grid gap-6 md:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
                 <div className="text-white/60 text-sm mb-2">Total Users</div>
                 <div className="text-4xl font-extrabold text-[#F59E0B]">
@@ -116,15 +117,22 @@ export default function AdminPage() {
                   {stats.paidSubscribers}
                 </div>
               </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
+                <div className="text-white/60 text-sm mb-2">Quote Leads</div>
+                <div className="text-4xl font-extrabold text-[#F59E0B]">
+                  {stats.leads}
+                </div>
+              </div>
             </div>
 
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
               <h2 className="text-2xl font-bold mb-3">Business Snapshot</h2>
-
               <div className="text-white/70 space-y-2">
                 <p>• Users registered: {stats.users}</p>
                 <p>• Diagnoses generated: {stats.diagnoses}</p>
                 <p>• Paid conversions: {stats.paidSubscribers}</p>
+                <p>• Quote leads captured: {stats.leads}</p>
               </div>
             </div>
           </>
