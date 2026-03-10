@@ -1,41 +1,38 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { supabaseServer } from '@/lib/supabaseServer'
+import { NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabaseServer";
 
-const supabasePublic = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const jwt = require("jsonwebtoken");
+
+export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const authHeader = req.headers.get('authorization') || ''
-  const token = authHeader.replace('Bearer ', '').trim()
+  try {
+    const authHeader = req.headers.get("authorization") || "";
+    const token = authHeader.replace("Bearer ", "").trim();
 
-  if (!token) {
-    return NextResponse.json({ error: 'Missing token' }, { status: 401 })
+    if (!token) {
+      return NextResponse.json({ error: "Missing token" }, { status: 401 });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    const userId = decoded.userId;
+
+    const { data: profile, error } = await supabaseServer
+      .from("profiles")
+      .select("id, email, trial_end, subscription_status, role")
+      .eq("id", userId)
+      .single();
+
+    if (error || !profile) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(profile);
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err?.message || "Server error" },
+      { status: 500 }
+    );
   }
-
-  const { data: userData, error: userErr } = await supabasePublic.auth.getUser(token)
-  if (userErr || !userData.user) {
-    return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-  }
-
-  const userId = userData.user.id
-
-  const { data: profile, error: pErr } = await supabaseServer
-    .from('profiles')
-    .select('email, trial_end, subscription_status')
-    .eq('id', userId)
-    .single()
-
-  if (pErr || !profile) {
-    return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
-  }
-
-  return NextResponse.json({
-  userId,
-  email: profile.email,
-  trial_end: profile.trial_end,
-  subscription_status: profile.subscription_status,
-})
 }

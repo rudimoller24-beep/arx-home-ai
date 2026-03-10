@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { supabaseServer } from "@/lib/supabaseServer";
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const jwt = require("jsonwebtoken");
 
 export const runtime = "nodejs";
 
@@ -13,7 +15,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Missing token" }, { status: 401 });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
     const userId = decoded.userId;
 
     const { data: profile, error: profileError } = await supabaseServer

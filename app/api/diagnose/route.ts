@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import jwt from "jsonwebtoken";
 import { supabaseServer } from "@/lib/supabaseServer";
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const jwt = require("jsonwebtoken");
 
 export const runtime = "nodejs";
 
@@ -18,7 +20,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing token" }, { status: 401 });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
     const userId = decoded.userId;
 
     const { name, phone, area, urgency, prompt } = await req.json();
@@ -27,7 +29,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Problem description is required" }, { status: 400 });
     }
 
-    // Check subscription status
     const { data: profile, error: profileError } = await supabaseServer
       .from("profiles")
       .select("subscription_status")
@@ -38,7 +39,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    // Free users: max 3 diagnoses
     if (profile.subscription_status !== "active") {
       const { count, error: countError } = await supabaseServer
         .from("diagnoses")
@@ -102,16 +102,11 @@ Keep it clear, practical, and suitable for a homeowner.
       completion.choices?.[0]?.message?.content?.trim() ||
       "Sorry, no diagnosis could be generated.";
 
-    // Save diagnosis history
-    const { error: saveError } = await supabaseServer.from("diagnoses").insert({
+    await supabaseServer.from("diagnoses").insert({
       user_id: userId,
       problem: prompt,
       result,
     });
-
-    if (saveError) {
-      console.error("SAVE_DIAGNOSIS_ERROR:", saveError);
-    }
 
     return NextResponse.json({ result });
   } catch (err: any) {
