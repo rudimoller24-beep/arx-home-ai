@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   try {
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.replace("Bearer ", "").trim();
@@ -18,30 +18,31 @@ export async function POST(req: Request) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!);
     const userId = decoded.userId;
 
-    const { name, phone, area, urgency, problem, diagnosis } = await req.json();
+    const { data: me, error: meError } = await supabaseServer
+      .from("profiles")
+      .select("id, role")
+      .eq("id", userId)
+      .single();
 
-    if (!problem || !diagnosis) {
-      return NextResponse.json(
-        { error: "Problem and diagnosis are required" },
-        { status: 400 }
-      );
+    if (meError || !me) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    const { error } = await supabaseServer.from("leads").insert({
-      user_id: userId,
-      name: name || "",
-      phone: phone || "",
-      area: area || "",
-      urgency: urgency || "",
-      problem,
-      diagnosis,
-    });
+    if (me.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { data, error } = await supabaseServer
+      .from("leads")
+      .select("id, name, phone, area, urgency, problem, diagnosis, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ leads: data || [] });
   } catch (err: any) {
     return NextResponse.json(
       { error: err?.message || "Server error" },
