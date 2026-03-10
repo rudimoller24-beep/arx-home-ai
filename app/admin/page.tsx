@@ -13,8 +13,8 @@ type Stats = {
 export default function AdminPage() {
   const router = useRouter()
   const [stats, setStats] = useState<Stats | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -64,6 +64,7 @@ export default function AdminPage() {
                 className="rounded-xl"
               />
             </div>
+
             <div>
               <div className="text-white/60 text-sm">ARX Home AI</div>
               <div className="text-3xl font-bold">Admin Analytics</div>
@@ -119,6 +120,7 @@ export default function AdminPage() {
 
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
               <h2 className="text-2xl font-bold mb-3">Business Snapshot</h2>
+
               <div className="text-white/70 space-y-2">
                 <p>• Users registered: {stats.users}</p>
                 <p>• Diagnoses generated: {stats.diagnoses}</p>
