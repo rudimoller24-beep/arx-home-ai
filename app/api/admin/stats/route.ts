@@ -4,6 +4,10 @@ import { supabaseServer } from "@/lib/supabaseServer";
 
 export const runtime = "nodejs";
 
+type JwtPayload = {
+  userId: string;
+};
+
 export async function GET(req: Request) {
   try {
     const authHeader = req.headers.get("authorization") || "";
@@ -13,13 +17,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Missing token" }, { status: 401 });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      userId: string;
-    };
-
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
     const userId = decoded.userId;
 
-    // Check if current user is admin
+    // First get the currently logged-in profile
     const { data: me, error: meError } = await supabaseServer
       .from("profiles")
       .select("id, email, role")
@@ -30,7 +31,23 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    if (me.role !== "admin") {
+    let isAdmin = me.role === "admin";
+
+    // If this exact row isn't admin, check whether another profile with the same email is admin
+    if (!isAdmin && me.email) {
+      const { data: adminMatch, error: adminMatchError } = await supabaseServer
+        .from("profiles")
+        .select("id, email, role")
+        .eq("email", me.email)
+        .eq("role", "admin")
+        .maybeSingle();
+
+      if (!adminMatchError && adminMatch) {
+        isAdmin = true;
+      }
+    }
+
+    if (!isAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -65,6 +82,7 @@ export async function GET(req: Request) {
       paidSubscribers: subscriberCount || 0,
     });
   } catch (err: any) {
+    console.error("ADMIN_STATS_ERROR:", err);
     return NextResponse.json(
       { error: err?.message || "Server error" },
       { status: 500 }
