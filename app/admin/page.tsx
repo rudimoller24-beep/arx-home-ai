@@ -26,7 +26,12 @@ export default function AdminPage() {
 
     const loadStats = async () => {
       try {
-        const res = await fetch('/api/admin/stats')
+        const res = await fetch('/api/admin/stats', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
         const data = await res.json()
 
         if (!res.ok) {
@@ -61,7 +66,7 @@ export default function AdminPage() {
             </div>
             <div>
               <div className="text-white/60 text-sm">ARX Home AI</div>
-              <div className="text-3xl font-bold">Admin Dashboard</div>
+              <div className="text-3xl font-bold">Admin Analytics</div>
             </div>
           </div>
 
@@ -69,7 +74,7 @@ export default function AdminPage() {
             onClick={() => router.push('/dashboard')}
             className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 font-semibold hover:bg-white/10"
           >
-            Back to Dashboard
+            ← Dashboard
           </button>
         </div>
       </div>
