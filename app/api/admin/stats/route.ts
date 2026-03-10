@@ -5,22 +5,38 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const { count: userCount } = await supabaseServer
+    const { count: userCount, error: userError } = await supabaseServer
       .from("profiles")
       .select("*", { count: "exact", head: true });
 
-    const { count: diagnosisCount } = await supabaseServer
+    if (userError) {
+      return NextResponse.json({ error: userError.message }, { status: 500 });
+    }
+
+    const { count: diagnosisCount, error: diagnosisError } = await supabaseServer
       .from("diagnoses")
       .select("*", { count: "exact", head: true });
 
-    const { count: subscriberCount } = await supabaseServer
+    if (diagnosisError) {
+      return NextResponse.json({ error: diagnosisError.message }, { status: 500 });
+    }
+
+    const { count: subscriberCount, error: subscriberError } = await supabaseServer
       .from("profiles")
       .select("*", { count: "exact", head: true })
       .eq("subscription_status", "active");
 
-    const { count: leadsCount } = await supabaseServer
+    if (subscriberError) {
+      return NextResponse.json({ error: subscriberError.message }, { status: 500 });
+    }
+
+    const { count: leadsCount, error: leadsError } = await supabaseServer
       .from("leads")
       .select("*", { count: "exact", head: true });
+
+    if (leadsError) {
+      return NextResponse.json({ error: leadsError.message }, { status: 500 });
+    }
 
     return NextResponse.json({
       users: userCount || 0,

@@ -17,6 +17,11 @@ export default function DiagnosePage() {
   const [error, setError] = useState('')
   const [remaining, setRemaining] = useState<string | number>('...')
   const [copied, setCopied] = useState(false)
+  const [quoteSent, setQuoteSent] = useState(false)
+
+  const [imageBase64, setImageBase64] = useState('')
+  const [imageMimeType, setImageMimeType] = useState('')
+  const [imagePreview, setImagePreview] = useState('')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -46,9 +51,24 @@ export default function DiagnosePage() {
     loadLimit()
   }, [router])
 
+  const handleImageUpload = (file: File) => {
+    const reader = new FileReader()
+
+    reader.onloadend = () => {
+      const result = reader.result as string
+      const base64 = result.split(',')[1] || ''
+      setImageBase64(base64)
+      setImageMimeType(file.type)
+      setImagePreview(result)
+    }
+
+    reader.readAsDataURL(file)
+  }
+
   const runDiagnosis = async () => {
     setError('')
     setResult('')
+    setQuoteSent(false)
     setLoading(true)
 
     try {
@@ -59,7 +79,6 @@ export default function DiagnosePage() {
         return
       }
 
-      // Check limit first
       const checkRes = await fetch('/api/diagnose/check', {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -93,6 +112,8 @@ export default function DiagnosePage() {
           area,
           urgency,
           prompt,
+          imageBase64,
+          imageMimeType,
         }),
       })
 
@@ -106,7 +127,6 @@ export default function DiagnosePage() {
 
       setResult(data.result)
 
-      // Refresh remaining count
       const refreshRes = await fetch('/api/diagnose/check', {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -121,6 +141,45 @@ export default function DiagnosePage() {
       setError('Server error')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const requestQuote = async () => {
+    try {
+      setError('')
+      const token = localStorage.getItem('token')
+
+      if (!token) {
+        router.push('/login')
+        return
+      }
+
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name,
+          phone,
+          area,
+          urgency,
+          problem: prompt,
+          diagnosis: result,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Could not send quote request')
+        return
+      }
+
+      setQuoteSent(true)
+    } catch {
+      setError('Could not send quote request')
     }
   }
 
@@ -208,12 +267,17 @@ export default function DiagnosePage() {
           </div>
         )}
 
+        {quoteSent && (
+          <div className="mb-6 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-green-300">
+            Quote request sent to ARX successfully.
+          </div>
+        )}
+
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* LEFT */}
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
             <h2 className="mb-2 text-2xl font-bold">Tell us what’s wrong</h2>
             <p className="mb-5 text-white/60">
-              Describe the issue and ARX Home AI will give a practical diagnosis.
+              Describe the issue and optionally upload a photo for AI image diagnosis.
             </p>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -260,6 +324,33 @@ export default function DiagnosePage() {
               onChange={(e) => setPrompt(e.target.value)}
             />
 
+            <div className="mt-4">
+              <label className="mb-2 block text-sm text-white/60">
+                Upload a photo of the problem (optional)
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleImageUpload(file)
+                }}
+                className="block w-full text-sm text-white/70 file:mr-4 file:rounded-xl file:border-0 file:bg-[#F59E0B] file:px-4 file:py-2 file:font-bold file:text-black"
+              />
+
+              {imagePreview && (
+                <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
+                  <Image
+                    src={imagePreview}
+                    alt="Problem preview"
+                    width={600}
+                    height={400}
+                    className="h-auto w-full rounded-xl object-cover"
+                  />
+                </div>
+              )}
+            </div>
+
             <div className="mt-5 flex flex-wrap gap-3">
               <button
                 onClick={runDiagnosis}
@@ -278,6 +369,10 @@ export default function DiagnosePage() {
                   setPrompt('')
                   setResult('')
                   setError('')
+                  setImageBase64('')
+                  setImageMimeType('')
+                  setImagePreview('')
+                  setQuoteSent(false)
                 }}
                 className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 font-semibold hover:bg-white/10"
               >
@@ -286,7 +381,6 @@ export default function DiagnosePage() {
             </div>
           </div>
 
-          {/* RIGHT */}
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
             <h2 className="mb-2 text-2xl font-bold">Diagnosis Result</h2>
             <p className="mb-5 text-white/60">
@@ -312,6 +406,14 @@ export default function DiagnosePage() {
                 className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 font-semibold hover:bg-white/10 disabled:opacity-40"
               >
                 Export PDF
+              </button>
+
+              <button
+                onClick={requestQuote}
+                disabled={!result}
+                className="rounded-xl bg-[#F59E0B] px-4 py-3 font-bold text-black hover:opacity-90 disabled:opacity-40"
+              >
+                Request ARX Quote
               </button>
 
               <a

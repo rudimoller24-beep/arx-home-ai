@@ -11,11 +11,23 @@ type Stats = {
   leads: number
 }
 
+type Lead = {
+  id: string
+  name: string
+  phone: string
+  area: string
+  urgency: string
+  problem: string
+  diagnosis: string
+  created_at: string
+}
+
 export default function AdminPage() {
   const router = useRouter()
   const [stats, setStats] = useState<Stats | null>(null)
-  const [error, setError] = useState('')
+  const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -25,22 +37,28 @@ export default function AdminPage() {
       return
     }
 
-    const loadStats = async () => {
+    const loadAdmin = async () => {
       try {
-        const res = await fetch('/api/admin/stats', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
+        const [statsRes, leadsRes] = await Promise.all([
+          fetch('/api/admin/stats'),
+          fetch('/api/admin/leads'),
+        ])
 
-        const data = await res.json()
+        const statsData = await statsRes.json()
+        const leadsData = await leadsRes.json()
 
-        if (!res.ok) {
-          setError(data.error || 'Could not load admin stats')
+        if (!statsRes.ok) {
+          setError(statsData.error || 'Could not load admin stats')
           return
         }
 
-        setStats(data)
+        if (!leadsRes.ok) {
+          setError(leadsData.error || 'Could not load leads')
+          return
+        }
+
+        setStats(statsData)
+        setLeads(leadsData.leads || [])
       } catch {
         setError('Server error')
       } finally {
@@ -48,13 +66,13 @@ export default function AdminPage() {
       }
     }
 
-    loadStats()
+    loadAdmin()
   }, [router])
 
   return (
     <div className="min-h-screen bg-[#0b0f14] text-white">
       <div className="border-b border-white/10 bg-gradient-to-r from-[#1b1307] via-[#0b0f14] to-[#101826]">
-        <div className="mx-auto max-w-6xl px-6 py-5 flex items-center justify-between">
+        <div className="mx-auto max-w-7xl px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="bg-white/5 border border-white/10 rounded-2xl p-2">
               <Image
@@ -81,10 +99,10 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-7xl px-6 py-8">
         {loading && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
-            Loading admin stats...
+            Loading admin data...
           </div>
         )}
 
@@ -127,13 +145,45 @@ export default function AdminPage() {
             </div>
 
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
-              <h2 className="text-2xl font-bold mb-3">Business Snapshot</h2>
-              <div className="text-white/70 space-y-2">
-                <p>• Users registered: {stats.users}</p>
-                <p>• Diagnoses generated: {stats.diagnoses}</p>
-                <p>• Paid conversions: {stats.paidSubscribers}</p>
-                <p>• Quote leads captured: {stats.leads}</p>
-              </div>
+              <h2 className="text-2xl font-bold mb-4">Latest Leads</h2>
+
+              {leads.length === 0 ? (
+                <div className="text-white/60">No leads yet.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-white/50 border-b border-white/10">
+                        <th className="py-3 pr-4">Date</th>
+                        <th className="py-3 pr-4">Name</th>
+                        <th className="py-3 pr-4">Phone</th>
+                        <th className="py-3 pr-4">Area</th>
+                        <th className="py-3 pr-4">Urgency</th>
+                        <th className="py-3 pr-4">Problem</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leads.map((lead) => (
+                        <tr
+                          key={lead.id}
+                          className="border-b border-white/5 align-top"
+                        >
+                          <td className="py-3 pr-4 whitespace-nowrap text-white/60">
+                            {new Date(lead.created_at).toLocaleString()}
+                          </td>
+                          <td className="py-3 pr-4">{lead.name || '-'}</td>
+                          <td className="py-3 pr-4">{lead.phone || '-'}</td>
+                          <td className="py-3 pr-4">{lead.area || '-'}</td>
+                          <td className="py-3 pr-4">{lead.urgency || '-'}</td>
+                          <td className="py-3 pr-4 max-w-[340px]">
+                            <div className="line-clamp-3">{lead.problem || '-'}</div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </>
         )}
