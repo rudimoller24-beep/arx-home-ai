@@ -42,6 +42,8 @@ export default function DiagnosePage() {
 
         if (res.ok) {
           setRemaining(data.remaining)
+        } else {
+          setError(data.error || 'Could not load usage')
         }
       } catch {
         setRemaining('...')
@@ -55,11 +57,11 @@ export default function DiagnosePage() {
     const reader = new FileReader()
 
     reader.onloadend = () => {
-      const result = reader.result as string
-      const base64 = result.split(',')[1] || ''
+      const dataUrl = reader.result as string
+      const base64 = dataUrl.split(',')[1] || ''
       setImageBase64(base64)
       setImageMimeType(file.type)
-      setImagePreview(result)
+      setImagePreview(dataUrl)
     }
 
     reader.readAsDataURL(file)
@@ -76,27 +78,6 @@ export default function DiagnosePage() {
 
       if (!token) {
         router.push('/login')
-        return
-      }
-
-      const checkRes = await fetch('/api/diagnose/check', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      const checkData = await checkRes.json()
-
-      if (!checkRes.ok) {
-        setError(checkData.error || 'Could not check usage')
-        setLoading(false)
-        return
-      }
-
-      if (!checkData.allowed) {
-        setError('You have reached your 3 free diagnoses. Please upgrade to continue.')
-        setRemaining(0)
-        setLoading(false)
         return
       }
 
@@ -228,10 +209,10 @@ export default function DiagnosePage() {
 
   return (
     <div className="min-h-screen bg-[#0b0f14] text-white">
-      <div className="border-b border-white/10 bg-gradient-to-r from-[#1b1307] via-[#0b0f14] to-[#101826]">
+      <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.20),transparent_26%),linear-gradient(to_right,#1b1307,#0b0f14,#101826)]">
         <div className="mx-auto max-w-6xl px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-2">
+            <div className="rounded-2xl border border-[#F59E0B]/25 bg-white/5 p-2 shadow-[0_0_30px_rgba(245,158,11,0.10)]">
               <Image
                 src="/arx-logo.jpg"
                 alt="ARX"
@@ -241,7 +222,7 @@ export default function DiagnosePage() {
               />
             </div>
             <div>
-              <div className="text-white/60 text-sm">ARX Home AI</div>
+              <div className="text-[#F59E0B] text-sm font-semibold">ARX Home AI</div>
               <div className="text-3xl font-bold">Diagnose a Problem</div>
             </div>
           </div>
@@ -256,9 +237,9 @@ export default function DiagnosePage() {
       </div>
 
       <div className="mx-auto max-w-6xl px-6 py-8">
-        <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80">
+        <div className="mb-6 rounded-2xl border border-[#F59E0B]/20 bg-[#F59E0B]/8 p-4 text-sm text-white/85">
           Remaining diagnoses:{' '}
-          <span className="font-bold text-[#F59E0B]">{remaining}</span>
+          <span className="font-extrabold text-[#F59E0B]">{remaining}</span>
         </div>
 
         {error && (
@@ -274,11 +255,16 @@ export default function DiagnosePage() {
         )}
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
-            <h2 className="mb-2 text-2xl font-bold">Tell us what’s wrong</h2>
-            <p className="mb-5 text-white/60">
-              Describe the issue and optionally upload a photo for AI image diagnosis.
-            </p>
+          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/7 to-white/[0.03] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+            <div className="mb-5">
+              <div className="text-[#F59E0B] text-sm font-semibold mb-2">
+                Smart issue intake
+              </div>
+              <h2 className="text-2xl font-bold">Tell us what’s wrong</h2>
+              <p className="mt-2 text-white/65">
+                Describe the issue and optionally upload a photo for AI image diagnosis.
+              </p>
+            </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <input
@@ -318,15 +304,15 @@ export default function DiagnosePage() {
             </div>
 
             <textarea
-              placeholder="Example: My ceiling has a damp patch that is growing near the bathroom and paint is peeling."
-              className="mt-4 min-h-[180px] w-full rounded-xl border border-white/15 bg-black/30 p-4 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/60"
+              placeholder="Example: My roof is leaking above the bedroom and I can see water marks spreading on the ceiling."
+              className="mt-4 min-h-[190px] w-full rounded-xl border border-white/15 bg-black/30 p-4 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/60"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
             />
 
-            <div className="mt-4">
-              <label className="mb-2 block text-sm text-white/60">
-                Upload a photo of the problem (optional)
+            <div className="mt-4 rounded-2xl border border-[#F59E0B]/15 bg-[#F59E0B]/5 p-4">
+              <label className="mb-2 block text-sm font-semibold text-[#F59E0B]">
+                Upload a photo (optional)
               </label>
               <input
                 type="file"
@@ -355,7 +341,7 @@ export default function DiagnosePage() {
               <button
                 onClick={runDiagnosis}
                 disabled={loading}
-                className="rounded-xl bg-[#F59E0B] px-5 py-3 font-extrabold text-black hover:opacity-90 disabled:opacity-50"
+                className="rounded-xl bg-[#F59E0B] px-5 py-3 font-extrabold text-black hover:opacity-90 shadow-[0_10px_30px_rgba(245,158,11,0.25)] disabled:opacity-50"
               >
                 {loading ? 'Diagnosing…' : 'Run Diagnosis'}
               </button>
@@ -381,13 +367,18 @@ export default function DiagnosePage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
-            <h2 className="mb-2 text-2xl font-bold">Diagnosis Result</h2>
-            <p className="mb-5 text-white/60">
-              Your AI-generated ARX diagnosis will appear here.
-            </p>
+          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/7 to-white/[0.03] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+            <div className="mb-5">
+              <div className="text-[#F59E0B] text-sm font-semibold mb-2">
+                ARX result
+              </div>
+              <h2 className="text-2xl font-bold">Diagnosis Result</h2>
+              <p className="mt-2 text-white/65">
+                Your AI-generated ARX diagnosis will appear here.
+              </p>
+            </div>
 
-            <div className="min-h-[300px] rounded-xl border border-white/10 bg-black/20 p-4 whitespace-pre-wrap text-white/90">
+            <div className="min-h-[320px] rounded-2xl border border-white/10 bg-black/20 p-5 whitespace-pre-wrap text-white/90">
               {result || 'No diagnosis yet.'}
             </div>
 
