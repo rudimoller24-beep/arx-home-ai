@@ -10,6 +10,11 @@ const openai = new OpenAI({
 });
 
 const jwtSecret = process.env.JWT_SECRET;
+
+if (!jwtSecret) {
+  throw new Error("Missing JWT_SECRET environment variable.");
+}
+
 const secret = new TextEncoder().encode(jwtSecret);
 
 export async function POST(req: Request) {
@@ -32,29 +37,47 @@ export async function POST(req: Request) {
 
     const { name, phone, area, urgency, prompt } = await req.json();
 
-    if (!prompt || !prompt.trim()) {
+    if (!prompt || !String(prompt).trim()) {
       return NextResponse.json(
         { error: "Problem description is required" },
         { status: 400 }
       );
     }
 
-    let profile = null;
+    let profile: {
+      id: string;
+      email: string;
+      subscription_status: string;
+    } | null = null;
 
-    const { data: profileById } = await supabaseServer
+    const { data: profileById, error: profileByIdError } = await supabaseServer
       .from("profiles")
       .select("id, email, subscription_status")
       .eq("id", userId)
       .maybeSingle();
 
+    if (profileByIdError) {
+      return NextResponse.json(
+        { error: "Could not load profile", details: profileByIdError.message },
+        { status: 500 }
+      );
+    }
+
     profile = profileById;
 
     if (!profile && userEmail) {
-      const { data: profileByEmail } = await supabaseServer
+      const { data: profileByEmail, error: profileByEmailError } = await supabaseServer
         .from("profiles")
         .select("id, email, subscription_status")
         .eq("email", userEmail)
         .maybeSingle();
+
+      if (profileByEmailError) {
+        return NextResponse.json(
+          { error: "Could not load profile", details: profileByEmailError.message },
+          { status: 500 }
+        );
+      }
 
       profile = profileByEmail;
     }
@@ -66,18 +89,24 @@ export async function POST(req: Request) {
     const resolvedUserId = profile.id;
 
     if (profile.subscription_status !== "active") {
-      const { count } = await supabaseServer
+      const { count, error: countError } = await supabaseServer
         .from("diagnoses")
         .select("*", { count: "exact", head: true })
         .eq("user_id", resolvedUserId);
+
+      if (countError) {
+        return NextResponse.json(
+          { error: "Could not check diagnosis limit", details: countError.message },
+          { status: 500 }
+        );
+      }
 
       const used = count || 0;
 
       if (used >= 3) {
         return NextResponse.json(
           {
-            error:
-              "You have reached your 3 free diagnoses. Please upgrade to continue.",
+            error: "You have reached your 3 free diagnoses. Please upgrade to continue.",
           },
           { status: 403 }
         );
@@ -87,11 +116,11 @@ export async function POST(req: Request) {
     const aiPrompt = `
 You are ARX Home AI, a practical home repair assistant for South Africa.
 
-Customer:
-Name: ${name || "-"}
-Phone: ${phone || "-"}
-Area: ${area || "-"}
-Urgency: ${urgency || "-"}
+Customer details:
+- Name: ${name || "-"}
+- Phone: ${phone || "-"}
+- Area: ${area || "-"}
+- Urgency: ${urgency || "-"}
 
 Problem:
 ${prompt}
@@ -114,7 +143,10 @@ Give the answer in this format:
           content:
             "You are a professional home repair diagnosis assistant for ARX Developments in South Africa.",
         },
-        { role: "user", content: aiPrompt },
+        {
+          role: "user",
+          content: aiPrompt,
+        },
       ],
       temperature: 0.4,
     });
@@ -123,11 +155,13 @@ Give the answer in this format:
       completion.choices?.[0]?.message?.content?.trim() ||
       "No diagnosis generated.";
 
-  await supabaseServer.from("diagnoses").insert({
-  user_id: resolvedUserId,
-  prompt,
-  result,
-});
+    const { error: insertError } = await supabaseServer
+      .from("diagnoses")
+      .insert({
+        user_id: resolvedUserId,
+        prompt: String(prompt).trim(),
+        result,
+      });
 
     if (insertError) {
       console.error("SAVE ERROR:", insertError);
@@ -140,6 +174,7 @@ Give the answer in this format:
     return NextResponse.json({ result });
   } catch (err: any) {
     console.error("DIAGNOSE ERROR:", err);
+
     return NextResponse.json(
       { error: err?.message || "Server error" },
       { status: 500 }
