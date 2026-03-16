@@ -123,11 +123,11 @@ Give the answer in this format:
       completion.choices?.[0]?.message?.content?.trim() ||
       "No diagnosis generated.";
 
-    const { error: insertError } = await supabaseServer.from("diagnoses").insert({
-      user_id: resolvedUserId,
-      problem: prompt,
-      result,
-    });
+  await supabaseServer.from("diagnoses").insert({
+  user_id: resolvedUserId,
+  prompt,
+  result,
+});
 
     if (insertError) {
       console.error("SAVE ERROR:", insertError);
