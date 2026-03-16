@@ -19,9 +19,8 @@ export default function DiagnosePage() {
   const [copied, setCopied] = useState(false)
   const [quoteSent, setQuoteSent] = useState(false)
 
-  const [imageBase64, setImageBase64] = useState('')
-  const [imageMimeType, setImageMimeType] = useState('')
-  const [imagePreview, setImagePreview] = useState('')
+  const [images, setImages] = useState<string[]>([])
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -53,18 +52,33 @@ export default function DiagnosePage() {
     loadLimit()
   }, [router])
 
-  const handleImageUpload = (file: File) => {
-    const reader = new FileReader()
+  const handleImageUpload = (files: FileList) => {
+    const selectedFiles = Array.from(files).slice(0, 5 - images.length)
 
-    reader.onloadend = () => {
-      const dataUrl = reader.result as string
-      const base64 = dataUrl.split(',')[1] || ''
-      setImageBase64(base64)
-      setImageMimeType(file.type)
-      setImagePreview(dataUrl)
-    }
+    selectedFiles.forEach((file) => {
+      const reader = new FileReader()
 
-    reader.readAsDataURL(file)
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string
+
+        setImages((prev) => {
+          if (prev.length >= 5) return prev
+          return [...prev, dataUrl]
+        })
+
+        setImagePreviews((prev) => {
+          if (prev.length >= 5) return prev
+          return [...prev, dataUrl]
+        })
+      }
+
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const removeImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index))
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index))
   }
 
   const runDiagnosis = async () => {
@@ -93,8 +107,7 @@ export default function DiagnosePage() {
           area,
           urgency,
           prompt,
-          imageBase64,
-          imageMimeType,
+          images,
         }),
       })
 
@@ -193,7 +206,7 @@ export default function DiagnosePage() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'arx-diagnosis.pdf'
+      a.download = 'diagnosis-report.pdf'
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -204,7 +217,7 @@ export default function DiagnosePage() {
   }
 
   const whatsappText = encodeURIComponent(
-    `ARX Home AI Diagnosis\n\nProblem:\n${prompt}\n\nDiagnosis:\n${result}`
+    `Diagnosis Report\n\nProblem:\n${prompt}\n\nDiagnosis:\n${result}`
   )
 
   return (
@@ -215,14 +228,14 @@ export default function DiagnosePage() {
             <div className="rounded-2xl border border-[#F59E0B]/25 bg-white/5 p-2 shadow-[0_0_30px_rgba(245,158,11,0.10)]">
               <Image
                 src="/arx-logo.jpg"
-                alt="ARX"
+                alt="Logo"
                 width={105}
                 height={50}
                 className="rounded-xl"
               />
             </div>
             <div>
-              <div className="text-[#F59E0B] text-sm font-semibold">ARX Home AI</div>
+              <div className="text-[#F59E0B] text-sm font-semibold">BuildMind</div>
               <div className="text-3xl font-bold">Diagnose a Problem</div>
             </div>
           </div>
@@ -250,7 +263,7 @@ export default function DiagnosePage() {
 
         {quoteSent && (
           <div className="mb-6 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-green-300">
-            Quote request sent to ARX successfully.
+            Quote request sent successfully.
           </div>
         )}
 
@@ -262,7 +275,7 @@ export default function DiagnosePage() {
               </div>
               <h2 className="text-2xl font-bold">Tell us what’s wrong</h2>
               <p className="mt-2 text-white/65">
-                Describe the issue and optionally upload a photo for AI image diagnosis.
+                Describe the issue and upload up to 5 photos for better diagnosis.
               </p>
             </div>
 
@@ -304,7 +317,7 @@ export default function DiagnosePage() {
             </div>
 
             <textarea
-              placeholder="Example: My roof is leaking above the bedroom and I can see water marks spreading on the ceiling."
+              placeholder="Example: Client has a leaking roof above the bedroom and water marks are spreading on the ceiling."
               className="mt-4 min-h-[190px] w-full rounded-xl border border-white/15 bg-black/30 p-4 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/60"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -312,27 +325,43 @@ export default function DiagnosePage() {
 
             <div className="mt-4 rounded-2xl border border-[#F59E0B]/15 bg-[#F59E0B]/5 p-4">
               <label className="mb-2 block text-sm font-semibold text-[#F59E0B]">
-                Upload a photo (optional)
+                Upload up to 5 photos
               </label>
+
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) handleImageUpload(file)
+                  const files = e.target.files
+                  if (files) handleImageUpload(files)
                 }}
                 className="block w-full text-sm text-white/70 file:mr-4 file:rounded-xl file:border-0 file:bg-[#F59E0B] file:px-4 file:py-2 file:font-bold file:text-black"
               />
 
-              {imagePreview && (
-                <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
-                  <Image
-                    src={imagePreview}
-                    alt="Problem preview"
-                    width={600}
-                    height={400}
-                    className="h-auto w-full rounded-xl object-cover"
-                  />
+              {imagePreviews.length > 0 && (
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {imagePreviews.map((preview, index) => (
+                    <div
+                      key={index}
+                      className="rounded-xl border border-white/10 bg-black/20 p-2"
+                    >
+                      <Image
+                        src={preview}
+                        alt={`Problem preview ${index + 1}`}
+                        width={300}
+                        height={220}
+                        className="h-32 w-full rounded-lg object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="mt-2 w-full rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/20"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -355,9 +384,8 @@ export default function DiagnosePage() {
                   setPrompt('')
                   setResult('')
                   setError('')
-                  setImageBase64('')
-                  setImageMimeType('')
-                  setImagePreview('')
+                  setImages([])
+                  setImagePreviews([])
                   setQuoteSent(false)
                 }}
                 className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 font-semibold hover:bg-white/10"
@@ -370,11 +398,11 @@ export default function DiagnosePage() {
           <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/7 to-white/[0.03] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
             <div className="mb-5">
               <div className="text-[#F59E0B] text-sm font-semibold mb-2">
-                ARX result
+                Diagnosis result
               </div>
-              <h2 className="text-2xl font-bold">Diagnosis Result</h2>
+              <h2 className="text-2xl font-bold">Professional Output</h2>
               <p className="mt-2 text-white/65">
-                Your AI-generated ARX diagnosis will appear here.
+                Your diagnosis report will appear here.
               </p>
             </div>
 
@@ -404,7 +432,7 @@ export default function DiagnosePage() {
                 disabled={!result}
                 className="rounded-xl bg-[#F59E0B] px-4 py-3 font-bold text-black hover:opacity-90 disabled:opacity-40"
               >
-                Request ARX Quote
+                Request Quote
               </button>
 
               <a
@@ -415,7 +443,7 @@ export default function DiagnosePage() {
                   !result ? 'pointer-events-none opacity-40' : ''
                 }`}
               >
-                WhatsApp to ARX
+                Share on WhatsApp
               </a>
             </div>
           </div>
