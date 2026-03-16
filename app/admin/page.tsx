@@ -1,193 +1,188 @@
-'use client'
+"use client";
 
-import Image from 'next/image'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from "react";
 
-type Stats = {
-  users: number
-  diagnoses: number
-  paidSubscribers: number
-  leads: number
-}
+type AdminUser = {
+  id: string;
+  email: string | null;
+  role: string | null;
+};
 
-type Lead = {
-  id: string
-  name: string
-  phone: string
-  area: string
-  urgency: string
-  problem: string
-  diagnosis: string
-  created_at: string
+function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+
+  const possibleKeys = [
+    "token",
+    "authToken",
+    "jwt",
+    "accessToken",
+    "arx_token",
+  ];
+
+  for (const key of possibleKeys) {
+    const value = localStorage.getItem(key);
+    if (value) return value;
+  }
+
+  return null;
 }
 
 export default function AdminPage() {
-  const router = useRouter()
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [leads, setLeads] = useState<Lead[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAllowed, setIsAllowed] = useState(false);
+  const [error, setError] = useState("");
+  const [user, setUser] = useState<AdminUser | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    let isMounted = true;
 
-    if (!token) {
-      router.push('/login')
-      return
-    }
+    async function loadAdminAccess() {
+      const token = getStoredToken();
 
-    const loadAdmin = async () => {
+      if (!token) {
+        if (!isMounted) return;
+        setError("You must be logged in to access admin.");
+        setIsAllowed(false);
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        const [statsRes, leadsRes] = await Promise.all([
-          fetch('/api/admin/stats'),
-          fetch('/api/admin/leads'),
-        ])
+        const response = await fetch("/api/admin/me", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-        const statsData = await statsRes.json()
-        const leadsData = await leadsRes.json()
+        const data = await response.json();
 
-        if (!statsRes.ok) {
-          setError(statsData.error || 'Could not load admin stats')
-          return
+        if (!response.ok) {
+          throw new Error(
+            data?.error || data?.details || "Failed to verify admin access."
+          );
         }
 
-        if (!leadsRes.ok) {
-          setError(leadsData.error || 'Could not load leads')
-          return
+        if (!data?.isAdmin) {
+          throw new Error("Admin access required.");
         }
 
-        setStats(statsData)
-        setLeads(leadsData.leads || [])
-      } catch {
-        setError('Server error')
+        if (!isMounted) return;
+
+        setUser(data.user ?? null);
+        setIsAllowed(true);
+        setError("");
+      } catch (err) {
+        if (!isMounted) return;
+
+        const message =
+          err instanceof Error ? err.message : "Access denied.";
+        setError(message);
+        setIsAllowed(false);
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
-    loadAdmin()
-  }, [router])
+    loadAdminAccess();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen bg-neutral-950 text-white">
+        <div className="mx-auto flex min-h-screen w-full max-w-5xl items-center justify-center px-4 py-10">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 h-10 w-10 animate-pulse rounded-2xl bg-orange-500/20" />
+            <h1 className="text-xl font-semibold">Checking admin access</h1>
+            <p className="mt-2 text-sm text-neutral-400">
+              Verifying permissions...
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!isAllowed) {
+    return (
+      <main className="min-h-screen bg-neutral-950 text-white">
+        <div className="mx-auto flex min-h-screen w-full max-w-5xl items-center justify-center px-4 py-10">
+          <div className="w-full max-w-md rounded-3xl border border-red-500/20 bg-red-500/10 p-6 shadow-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-red-200">
+              Access denied
+            </p>
+            <h1 className="mt-3 text-2xl font-semibold">Admin only</h1>
+            <p className="mt-3 text-sm leading-6 text-red-100/90">
+              {error || "You do not have permission to view this page."}
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#0b0f14] text-white">
-      <div className="border-b border-white/10 bg-gradient-to-r from-[#1b1307] via-[#0b0f14] to-[#101826]">
-        <div className="mx-auto max-w-7xl px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-2">
-              <Image
-                src="/arx-logo.jpg"
-                alt="ARX"
-                width={105}
-                height={50}
-                className="rounded-xl"
-              />
+    <main className="min-h-screen bg-neutral-950 text-white">
+      <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-300/90">
+            Admin
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight">
+            Admin dashboard
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm text-neutral-400 sm:text-base">
+            This area is protected by a server-side role check against the
+            profiles table.
+          </p>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-neutral-500">
+                User ID
+              </p>
+              <p className="mt-2 break-all text-sm text-white">
+                {user?.id || "-"}
+              </p>
             </div>
 
-            <div>
-              <div className="text-white/60 text-sm">ARX Home AI</div>
-              <div className="text-3xl font-bold">Admin Analytics</div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-neutral-500">
+                Email
+              </p>
+              <p className="mt-2 break-all text-sm text-white">
+                {user?.email || "-"}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-neutral-500">
+                Role
+              </p>
+              <p className="mt-2 text-sm text-white">
+                {user?.role || "-"}
+              </p>
             </div>
           </div>
 
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 font-semibold hover:bg-white/10"
-          >
-            ← Dashboard
-          </button>
+          <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-4">
+            <p className="text-sm font-medium text-white">
+              Ready for admin-only features
+            </p>
+            <p className="mt-2 text-sm leading-6 text-neutral-400">
+              You can now safely build admin-only pages and routes for user
+              management, subscription oversight, usage tracking, and platform
+              controls.
+            </p>
+          </div>
         </div>
       </div>
-
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        {loading && (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-white/70">
-            Loading admin data...
-          </div>
-        )}
-
-        {error && (
-          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-red-300">
-            {error}
-          </div>
-        )}
-
-        {!loading && !error && stats && (
-          <>
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
-                <div className="text-white/60 text-sm mb-2">Total Users</div>
-                <div className="text-4xl font-extrabold text-[#F59E0B]">
-                  {stats.users}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
-                <div className="text-white/60 text-sm mb-2">Total Diagnoses</div>
-                <div className="text-4xl font-extrabold text-[#F59E0B]">
-                  {stats.diagnoses}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
-                <div className="text-white/60 text-sm mb-2">Paid Subscribers</div>
-                <div className="text-4xl font-extrabold text-[#F59E0B]">
-                  {stats.paidSubscribers}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
-                <div className="text-white/60 text-sm mb-2">Quote Leads</div>
-                <div className="text-4xl font-extrabold text-[#F59E0B]">
-                  {stats.leads}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
-              <h2 className="text-2xl font-bold mb-4">Latest Leads</h2>
-
-              {leads.length === 0 ? (
-                <div className="text-white/60">No leads yet.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-white/50 border-b border-white/10">
-                        <th className="py-3 pr-4">Date</th>
-                        <th className="py-3 pr-4">Name</th>
-                        <th className="py-3 pr-4">Phone</th>
-                        <th className="py-3 pr-4">Area</th>
-                        <th className="py-3 pr-4">Urgency</th>
-                        <th className="py-3 pr-4">Problem</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {leads.map((lead) => (
-                        <tr
-                          key={lead.id}
-                          className="border-b border-white/5 align-top"
-                        >
-                          <td className="py-3 pr-4 whitespace-nowrap text-white/60">
-                            {new Date(lead.created_at).toLocaleString()}
-                          </td>
-                          <td className="py-3 pr-4">{lead.name || '-'}</td>
-                          <td className="py-3 pr-4">{lead.phone || '-'}</td>
-                          <td className="py-3 pr-4">{lead.area || '-'}</td>
-                          <td className="py-3 pr-4">{lead.urgency || '-'}</td>
-                          <td className="py-3 pr-4 max-w-[340px]">
-                            <div className="line-clamp-3">{lead.problem || '-'}</div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
+    </main>
+  );
 }
