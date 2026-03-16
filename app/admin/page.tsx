@@ -177,8 +177,7 @@ export default function AdminPage() {
             </p>
             <p className="mt-2 text-sm leading-6 text-neutral-400">
               You can now safely build admin-only pages and routes for user
-              management, subscription oversight, usage tracking, and platform
-              controls.
+              management, subscriptions, platform controls, and analytics.
             </p>
           </div>
         </div>

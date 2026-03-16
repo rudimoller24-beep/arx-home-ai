@@ -55,7 +55,7 @@ export function verifyJwtToken(token: string): JwtPayload {
   const decoded = jwt.verify(token, jwtSecret) as JwtPayload;
 
   if (!decoded?.sub) {
-    throw new Error("Invalid token payload: missing sub");
+    throw new Error("Unauthorized: invalid token payload");
   }
 
   return decoded;

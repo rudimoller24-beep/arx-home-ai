@@ -13,17 +13,28 @@ export async function GET(request: NextRequest) {
       isAdmin: user.role === "admin",
     });
   } catch (error) {
+    console.error("Admin auth error:", error);
+
     const message =
       error instanceof Error ? error.message : "Unexpected server error";
 
-    const status = message.includes("missing token") || message.includes("Unauthorized")
-      ? 401
-      : 500;
+    let status = 500;
+
+    if (message.toLowerCase().includes("missing token")) {
+      status = 401;
+    }
+
+    if (message.toLowerCase().includes("unauthorized")) {
+      status = 401;
+    }
+
+    if (message.toLowerCase().includes("forbidden")) {
+      status = 403;
+    }
 
     return NextResponse.json(
       {
-        error: "Failed to load current user",
-        details: message,
+        error: message,
       },
       { status }
     );
